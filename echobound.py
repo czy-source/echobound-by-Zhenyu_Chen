@@ -1,5 +1,5 @@
 """
-Echobound - an echolocation maze game built with pygame.
+Echobound — an echolocation maze game built with pygame.
 
 Core idea: the player cannot see the maze. Pressing SPACE emits a sound wave
 (a ring of rays) that travels outward, reflects off walls, and briefly lights
@@ -10,7 +10,7 @@ that hunts by sound chases them using A* pathfinding.
 Algorithms used (mapped to course lectures):
   - Recursive Backtracker maze generation        (Lecture 3)
   - Raycasting expanding "sonar" wave-front        (Lecture 9)
-  - A* pathfinding - used two opposite ways:       (Lecture 4)
+  - A* pathfinding — used two opposite ways:       (Lecture 4)
       * the enemy chases the last position it HEARD you ping
       * the exit "beacon" guides you (closer = higher pitch + faster)
   - BFS shortest-path distance for the exit beacon (Lecture 4)
@@ -26,18 +26,12 @@ Run normally:         python echobound.py
 Deterministic maze:   python echobound.py --seed 7
 Tune difficulty:      python echobound.py --render 320 --fade 3 --enemy-speed 14
 Generate screenshots: python echobound.py --shots
-Web build (pygbag):   pip install pygbag && pygbag echobound.py  (then open localhost:8000)
-
-The game loop is async (await asyncio.sleep(0) each frame) and all audio is
-optional/guarded, so it runs in the browser via pygbag/WebAssembly as well as
-on the desktop. No external asset files or local file writes are used.
 """
 
 import sys
 import math
 import random
 import heapq
-import asyncio
 import argparse
 from collections import deque
 
@@ -103,7 +97,7 @@ EXIT_COLOR = (120, 255, 140)
 
 
 # ---------------------------------------------------------------------------
-# Maze generation - Recursive Backtracker (Lecture 3)
+# Maze generation — Recursive Backtracker (Lecture 3)
 # ---------------------------------------------------------------------------
 def generate_maze(cols, rows):
     """Return a 2D grid: True = wall, False = open. Recursive backtracker."""
@@ -201,7 +195,7 @@ def lerp(a, b, t):
 
 
 # ---------------------------------------------------------------------------
-# Glow sprites - soft radial light with distance falloff (Lecture 10).
+# Glow sprites — soft radial light with distance falloff (Lecture 10).
 # Instead of flat dots we blit pre-rendered glows so lit surfaces, the player
 # and the enemy read as light blooming out of the darkness.
 # ---------------------------------------------------------------------------
@@ -243,22 +237,17 @@ def build_glow_assets():
 # ---------------------------------------------------------------------------
 class Audio:
     def __init__(self):
-        # All audio is optional: browsers (pygbag/WebAssembly) have limited mixer
-        # support and only allow sound after a user gesture. Any failure here must
-        # leave self.ok == False so the game runs silently instead of crashing.
         self.ok = False
-        self._beacon_cache = {}
-        self.step_sound = None
-        self.ping_sound = None
         if not _HAS_NUMPY:
             return
         try:
             pygame.mixer.init(frequency=SAMPLE_RATE, size=-16, channels=2, buffer=512)
-            self.step_sound = self._make_step()
-            self.ping_sound = self._make_ping()
-            self.ok = True
-        except Exception:           # noqa: BLE001 - any audio error -> stay silent
-            self.ok = False
+        except pygame.error:
+            return
+        self.ok = True
+        self._beacon_cache = {}
+        self.step_sound = self._make_step()
+        self.ping_sound = self._make_ping()
 
     def _make(self, freq, ms, vol=0.5, kind="sine"):
         """Build a short pygame Sound (stereo int16) for a tone or noise burst."""
@@ -317,40 +306,30 @@ class Audio:
         return pygame.sndarray.make_sound(stereo)
 
     def play_ping(self):
-        if not self.ok:
-            return
-        try:
+        if self.ok:
             self.ping_sound.play()
-        except Exception:           # noqa: BLE001
-            pass
 
     def play_step(self, left, right):
         if not self.ok:
             return
-        try:
-            ch = self.step_sound.play()
-            if ch:
-                ch.set_volume(clamp(left, 0, 1), clamp(right, 0, 1))
-        except Exception:           # noqa: BLE001
-            pass
+        ch = self.step_sound.play()
+        if ch:
+            ch.set_volume(clamp(left, 0, 1), clamp(right, 0, 1))
 
     def play_beacon(self, closeness):
         """closeness in 0..1: closer to exit = higher pitch + louder."""
         if not self.ok:
             return
-        try:
-            pitch = int(300 + closeness * 500)
-            key = pitch // 25 * 25             # cache tones in 25 Hz buckets
-            snd = self._beacon_cache.get(key)
-            if snd is None:
-                snd = self._make(key or 300, 90, vol=0.5, kind="sine")
-                self._beacon_cache[key] = snd
-            ch = snd.play()
-            if ch:
-                v = clamp(0.12 + closeness * 0.5, 0, 1)
-                ch.set_volume(v, v)
-        except Exception:           # noqa: BLE001
-            pass
+        pitch = int(300 + closeness * 500)
+        key = pitch // 25 * 25                 # cache tones in 25 Hz buckets
+        snd = self._beacon_cache.get(key)
+        if snd is None:
+            snd = self._make(key or 300, 90, vol=0.5, kind="sine")
+            self._beacon_cache[key] = snd
+        ch = snd.play()
+        if ch:
+            v = clamp(0.12 + closeness * 0.5, 0, 1)
+            ch.set_volume(v, v)
 
 
 # ---------------------------------------------------------------------------
@@ -686,14 +665,14 @@ def draw_pause(screen, font, small_font):
 # ---------------------------------------------------------------------------
 # Interactive entry point
 # ---------------------------------------------------------------------------
-async def run():
+def run():
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Echobound")
     # Stop SDL text-input mode so a CJK/IME doesn't swallow letter keys (e.g. R)
     try:
         pygame.key.stop_text_input()
-    except (AttributeError, pygame.error):
+    except AttributeError:
         pass
     clock = pygame.time.Clock()
     audio = Audio()
@@ -762,7 +741,6 @@ async def run():
         if state == "menu":
             draw_menu(screen, font, small_font, selected)
             pygame.display.flip()
-            await asyncio.sleep(0)        # yield to the browser event loop (pygbag)
             clock.tick(FPS)
             continue
 
@@ -807,7 +785,6 @@ async def run():
             draw_pause(screen, font, small_font)
 
         pygame.display.flip()
-        await asyncio.sleep(0)            # yield to the browser event loop (pygbag)
         clock.tick(FPS)
     pygame.quit()
 
@@ -861,13 +838,8 @@ def shots():
     print("saved shot1_echo.png, shot2_explored.png, shot3_debug.png")
 
 
-def _apply_cli_args():
-    """Parse command-line options for difficulty/PCG tuning (#7/#9).
-    Skipped entirely in the browser (pygbag/WebAssembly), where there is no
-    real argv and argparse could misbehave."""
-    if sys.platform == "emscripten":
-        return False
-    p = argparse.ArgumentParser(description="Echobound - an echolocation maze game.")
+def main(argv=None):
+    p = argparse.ArgumentParser(description="Echobound — an echolocation maze game.")
     p.add_argument("--shots", action="store_true",
                    help="render headless screenshots instead of playing")
     p.add_argument("--seed", type=int, default=None,
@@ -878,7 +850,7 @@ def _apply_cli_args():
                    help="light fade per frame; lower = longer memory (#7)")
     p.add_argument("--enemy-speed", type=int, default=None, metavar="FRAMES",
                    help="frames per enemy step; lower = faster enemy (#7)")
-    args = p.parse_args()
+    args = p.parse_args(argv)
 
     # PCG / difficulty parameter tuning (#7): override module globals up front
     global ECHO_MAX, FADE_PER_FRAME, ENEMY_MOVE_FRAMES, SEED
@@ -891,20 +863,12 @@ def _apply_cli_args():
     if args.seed is not None:
         SEED = args.seed
         random.seed(args.seed)
-    return args.shots
 
-
-async def main():
-    """Async entry point required by pygbag for browser/WebAssembly play.
-    Works unchanged for normal desktop runs via `python echobound.py`."""
-    want_shots = _apply_cli_args()
-    if want_shots:
+    if args.shots:
         shots()
-        return
-    await run()
+    else:
+        run()
 
 
-# pygbag runs this module and drives the asyncio loop; this also works as a
-# plain desktop launch (`python echobound.py`).
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
