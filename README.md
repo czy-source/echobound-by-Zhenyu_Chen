@@ -4,6 +4,20 @@
 
 Echobound is a top-down echolocation maze game built with Python and pygame. The screen is almost entirely black. Instead of seeing the walls, you press a key to send out a sound wave that ripples outward, strikes nearby surfaces, and briefly lights up their outline before the world fades back into darkness. You navigate a maze you have never actually seen — by memory, and by the fading echoes of your own pings — while an enemy that hunts by sound tries to reach you first.
 
+## Screenshots
+
+| Start menu | A single echo |
+|---|---|
+| ![menu](screenshots/shot_menu.png) | ![ping](screenshots/shot_ping.png) |
+
+| The three elements (you / enemy / exit) | Memory map while exploring |
+|---|---|
+| ![elements](screenshots/shot_elements.png) | ![explored](screenshots/shot_explored.png) |
+
+| Full maze (debug view — note the loops added by braiding) |
+|---|
+| ![debug](screenshots/shot_debug.png) |
+
 ## How to play
 
 | Key | Action |
